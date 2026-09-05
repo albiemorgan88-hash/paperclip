@@ -36,10 +36,13 @@ cleanup_release_state() {
   # Never reset every changed file or enumerate/delete all untracked files.
   # Changesets may edit/remove existing version files and create changelogs.
   local path
-  for path in "${release_state_paths[@]}"; do
+  # macOS ships Bash 3.2, where an empty array is unbound under `set -u`.
+  for path in "${release_state_paths[@]-}"; do
+    [ -n "$path" ] || continue
     git -C "$REPO_ROOT" checkout -q "$release_state_commit" -- "$path"
   done
-  for path in "${release_new_changelogs[@]}"; do
+  for path in "${release_new_changelogs[@]-}"; do
+    [ -n "$path" ] || continue
     rm -f "$REPO_ROOT/$path"
   done
 }
