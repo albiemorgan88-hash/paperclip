@@ -1,261 +1,50 @@
 ---
 name: release
-description: >
-  Coordinate a full Paperclip release across engineering verification, npm,
-  GitHub, website publishing, and announcement follow-up. Use when leadership
-  asks to ship a release, not merely to discuss version bumps.
+description: Prepare, rehearse or publish a Paperclip release when a release workflow is requested.
 ---
 
-# Release Coordination Skill
+# Paperclip Releases
 
-Run the full Paperclip release as a maintainer workflow, not just an npm publish.
+Choose the route from the user's request and existing authority. Establish the requested bump (`patch`, `minor`, `major`), target channel and execution environment. Infer already-specified choices; ask only for a decision that changes the next necessary action. If publication was not requested, prepare a reviewable result.
 
-This skill coordinates:
+## Modes
 
-- stable changelog drafting via `release-changelog`
-- release-train setup via `scripts/release-start.sh`
-- prerelease canary publishing via `scripts/release.sh --canary`
-- Docker smoke testing via `scripts/docker-onboard-smoke.sh`
-- stable publishing via `scripts/release.sh`
-- pushing the stable branch commit and tag
-- GitHub Release creation via `scripts/create-github-release.sh`
-- website / announcement follow-up tasks
+Set `BUMP` below to the agreed bump. Commands run from the Paperclip repository root.
 
-## Trigger
+| Mode | Entry command | Effects and completion |
+|---|---|---|
+| Dry-run plan | `./scripts/release-start.sh "$BUMP" --dry-run` | Fetches remote refs and inspects release state, but creates no branch/worktree and pushes nothing. Finish with the plan and evidence. |
+| Local preparation | `./scripts/release-start.sh "$BUMP" --no-push` | Fetches and creates/resumes a release worktree without pushing its branch. Finish with changelog and feasible verification. |
+| Live release | [Live release procedure](references/live-release.md) | Use only for the authorised publishing scope. Verify the remote before any push. |
 
-Use this skill when leadership asks for:
+A dry-run command's printed “next steps” can include live commands. They are suggestions, not permission to change modes. Never follow an unqualified publish command from dry-run output.
 
-- "do a release"
-- "ship the next patch/minor/major"
-- "release vX.Y.Z"
+## Packaging rehearsal
 
-## Preconditions
+`release-start.sh --dry-run` only plans; packaging rehearsal uses `release.sh --dry-run`, which versions files, builds packages and restores release-managed state. It is not read-only.
 
-Before proceeding, verify all of the following:
+Use a clean disposable clone with a dedicated release worktree and no concurrent writes. Do not reuse an active development worktree: `release-start.sh` can return an existing worktree for the release branch. Within that isolated clone, prepare the release train with `--no-push`, enter the returned worktree, and run only the appropriate rehearsal:
 
-1. `.agents/skills/release-changelog/SKILL.md` exists and is usable.
-2. The repo working tree is clean, including untracked files.
-3. There are commits since the last stable tag.
-4. The release SHA has passed the verification gate or is about to.
-5. If package manifests changed, the CI-owned `pnpm-lock.yaml` refresh is already merged on `master` before the release branch is cut.
-6. npm publish rights are available locally, or the GitHub release workflow is being used with trusted publishing.
-7. If running through Paperclip, you have issue context for status updates and follow-up task creation.
-
-If any precondition fails, stop and report the blocker.
-
-## Inputs
-
-Collect these inputs up front:
-
-- requested bump: `patch`, `minor`, or `major`
-- whether this run is a dry run or live release
-- whether the release is being run locally or from GitHub Actions
-- release issue / company context for website and announcement follow-up
-
-## Step 0 — Release Model
-
-Paperclip now uses this release model:
-
-1. Start or resume `release/X.Y.Z`
-2. Draft the **stable** changelog as `releases/vX.Y.Z.md`
-3. Publish one or more **prerelease canaries** such as `X.Y.Z-canary.0`
-4. Smoke test the canary via Docker
-5. Publish the stable version `X.Y.Z`
-6. Push the stable branch commit and tag
-7. Create the GitHub Release
-8. Merge `release/X.Y.Z` back to `master` without squash or rebase
-9. Complete website and announcement surfaces
-
-Critical consequence:
-
-- Canaries do **not** use promote-by-dist-tag anymore.
-- The changelog remains stable-only. Do not create `releases/vX.Y.Z-canary.N.md`.
-
-## Step 1 — Decide the Stable Version
-
-Start the release train first:
-
-```bash
-./scripts/release-start.sh {patch|minor|major}
+```sh
+./scripts/release.sh "$BUMP" --canary --dry-run
+# Or, for a stable packaging rehearsal:
+./scripts/release.sh "$BUMP" --dry-run
 ```
 
-Then run release preflight:
+Stable rehearsal requires the stable changelog. Never append a live release command to a rehearsal block. No npm publish credentials are required by dry-run mode, although package installation and state inspection may need network access. Record any outputs left for inspection; do not remove unrelated files to make the tree look clean.
 
-```bash
-./scripts/release-preflight.sh canary {patch|minor|major}
-# or
-./scripts/release-preflight.sh stable {patch|minor|major}
-```
+## Preconditions apply to the action
 
-Then use the last stable tag as the base:
+- Versioning/publishing requires a clean isolated release checkout, the matching `release/X.Y.Z` branch, new commits and an unused target version.
+- If manifests changed, the CI-owned lockfile refresh must already be merged on `master` before cutting the release branch. Preserve frozen-lockfile CI behaviour.
+- Publish requires local npm rights or the configured trusted-publishing workflow. Missing publish rights does not block drafting or feasible dry-run checks.
+- Use `release-changelog` when drafting the stable changelog. If the companion is unavailable, follow `doc/RELEASING.md` and preserve existing manual edits.
+- Paperclip issue updates require an actual authorised Paperclip coordination context; a standalone local release does not require creating an issue.
 
-```bash
-LAST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -1)
-git log "${LAST_TAG}..HEAD" --oneline --no-merges
-git diff --name-only "${LAST_TAG}..HEAD" -- packages/db/src/migrations/
-git diff "${LAST_TAG}..HEAD" -- packages/db/src/schema/
-git log "${LAST_TAG}..HEAD" --format="%s" | rg -n 'BREAKING CHANGE|BREAKING:|^[a-z]+!:' || true
-```
+## Invariants and completion
 
-Bump policy:
+Canaries use the next stable version and increasing ordinals, never a version already stable. Keep `latest` unchanged for canaries, do not create canary changelog files or Git tags, and never republish an already published version. Changelogs remain `releases/vX.Y.Z.md`.
 
-- destructive migrations, removed APIs, breaking config changes -> `major`
-- additive migrations or clearly user-visible features -> at least `minor`
-- fixes only -> `patch`
+Release candidates need the full verification gate. `release-preflight.sh` already runs it; reuse an unchanged passing result and rerun affected checks after fixes. Continue authorised work through verification; stop a recurring publish failure when progress needs a changed decision or external state. Preserve rollback guidance and report partially completed publication precisely.
 
-If the requested bump is too low, escalate it and explain why.
-
-## Step 2 — Draft the Stable Changelog
-
-Invoke `release-changelog` and generate:
-
-- `releases/vX.Y.Z.md`
-
-Rules:
-
-- review the draft with a human before publish
-- preserve manual edits if the file already exists
-- keep the heading and filename stable-only, for example `v1.2.3`
-- do not create a separate canary changelog file
-
-## Step 3 — Verify the Release SHA
-
-Run the standard gate:
-
-```bash
-pnpm -r typecheck
-pnpm test:run
-pnpm build
-```
-
-If the release will be run through GitHub Actions, the workflow can rerun this gate. Still report whether the local tree currently passes.
-
-The GitHub Actions release workflow installs with `pnpm install --frozen-lockfile`. Treat that as a release invariant, not a nuisance: if manifests changed and the lockfile refresh PR has not landed yet, stop and wait for `master` to contain the committed lockfile before shipping.
-
-## Step 4 — Publish a Canary
-
-Run from the `release/X.Y.Z` branch:
-
-```bash
-./scripts/release.sh {patch|minor|major} --canary --dry-run
-./scripts/release.sh {patch|minor|major} --canary
-```
-
-What this means:
-
-- npm receives `X.Y.Z-canary.N` under dist-tag `canary`
-- `latest` remains unchanged
-- no git tag is created
-- the script cleans the working tree afterward
-
-Guard:
-
-- if the current stable is `0.2.7`, the next patch canary is `0.2.8-canary.0`
-- the tooling must never publish `0.2.7-canary.N` after `0.2.7` is already stable
-
-After publish, verify:
-
-```bash
-npm view paperclipai@canary version
-```
-
-The user install path is:
-
-```bash
-npx paperclipai@canary onboard
-```
-
-## Step 5 — Smoke Test the Canary
-
-Run:
-
-```bash
-PAPERCLIPAI_VERSION=canary ./scripts/docker-onboard-smoke.sh
-```
-
-Confirm:
-
-1. install succeeds
-2. onboarding completes
-3. server boots
-4. UI loads
-5. basic company/dashboard flow works
-
-If smoke testing fails:
-
-- stop the stable release
-- fix the issue
-- publish another canary
-- repeat the smoke test
-
-Each retry should create a higher canary ordinal, while the stable target version can stay the same.
-
-## Step 6 — Publish Stable
-
-Once the SHA is vetted, run:
-
-```bash
-./scripts/release.sh {patch|minor|major} --dry-run
-./scripts/release.sh {patch|minor|major}
-```
-
-Stable publish does this:
-
-- publishes `X.Y.Z` to npm under `latest`
-- creates the local release commit
-- creates the local git tag `vX.Y.Z`
-
-Stable publish does **not** push the release for you.
-
-## Step 7 — Push and Create GitHub Release
-
-After stable publish succeeds:
-
-```bash
-git push public-gh HEAD --follow-tags
-./scripts/create-github-release.sh X.Y.Z
-```
-
-Use the stable changelog file as the GitHub Release notes source.
-
-Then open the PR from `release/X.Y.Z` back to `master` and merge without squash or rebase.
-
-## Step 8 — Finish the Other Surfaces
-
-Create or verify follow-up work for:
-
-- website changelog publishing
-- launch post / social announcement
-- any release summary in Paperclip issue context
-
-These should reference the stable release, not the canary.
-
-## Failure Handling
-
-If the canary is bad:
-
-- publish another canary, do not ship stable
-
-If stable npm publish succeeds but push or GitHub release creation fails:
-
-- fix the git/GitHub issue immediately from the same checkout
-- do not republish the same version
-
-If `latest` is bad after stable publish:
-
-```bash
-./scripts/rollback-latest.sh <last-good-version>
-```
-
-Then fix forward with a new patch release.
-
-## Output
-
-When the skill completes, provide:
-
-- stable version and, if relevant, the final canary version tested
-- verification status
-- npm status
-- git tag / GitHub Release status
-- website / announcement follow-up status
-- rollback recommendation if anything is still partially complete
+Report the version/channel, revision, checks, prepared artifacts and actual npm/Git/GitHub state. Drafts and rehearsals end with their deliverable. Merge, website publication and announcements follow the user's actual authority for those actions.

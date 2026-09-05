@@ -173,10 +173,19 @@ fi
 
 release_info ""
 release_info "Next steps:"
-release_info "  cd $worktree_path"
-release_info "  Draft or update releases/v${target_stable_version}.md"
-release_info "  ./scripts/release-preflight.sh canary $bump_type"
-release_info "  ./scripts/release.sh $bump_type --canary"
-release_info ""
-release_info "Merge rule:"
-release_info "  Merge $release_branch back to master without squash or rebase so tag $release_tag remains reachable from master."
+if [ "$dry_run" = true ]; then
+  release_info "  Review the release plan above. No branch or worktree was created."
+  release_info "  If local preparation is requested, run with --no-push in an isolated release checkout."
+else
+  release_info "  cd $worktree_path"
+  release_info "  Draft or update releases/v${target_stable_version}.md"
+  release_info "  ./scripts/release-preflight.sh canary $bump_type"
+  if [ "$push_branch" = true ]; then
+    release_info "  With canary publication authorised: ./scripts/release.sh $bump_type --canary"
+  else
+    release_info "  Local preparation only; publication requires separate authority."
+  fi
+  release_info ""
+  release_info "Merge rule (when authorised):"
+  release_info "  Merge $release_branch back to master without squash or rebase so tag $release_tag remains reachable from master."
+fi

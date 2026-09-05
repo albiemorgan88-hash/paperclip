@@ -17,6 +17,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=./release-lib.sh
 . "$REPO_ROOT/scripts/release-lib.sh"
+# shellcheck source=./release-state.sh
+. "$REPO_ROOT/scripts/release-state.sh"
 CLI_DIR="$REPO_ROOT/cli"
 TEMP_CHANGESET_FILE="$REPO_ROOT/.changeset/release-bump.md"
 TEMP_PRE_FILE="$REPO_ROOT/.changeset/pre.json"
@@ -43,7 +45,8 @@ Notes:
     dist-tag "canary".
   - Stable publishes 1.2.3 under the npm dist-tag "latest".
   - Run this from branch release/X.Y.Z matching the computed target version.
-  - Dry runs leave the working tree clean.
+  - Use a clean, isolated release checkout with no concurrent writes.
+  - Dry runs restore release-managed files; unrelated files are preserved.
 EOF
 }
 
@@ -86,32 +89,6 @@ restore_publish_artifacts() {
   for pkg_dir in server packages/adapters/claude-local packages/adapters/codex-local; do
     rm -rf "$REPO_ROOT/$pkg_dir/skills"
   done
-}
-
-cleanup_release_state() {
-  restore_publish_artifacts
-
-  rm -f "$TEMP_CHANGESET_FILE" "$TEMP_PRE_FILE"
-
-  tracked_changes="$(git -C "$REPO_ROOT" diff --name-only; git -C "$REPO_ROOT" diff --cached --name-only)"
-  if [ -n "$tracked_changes" ]; then
-    printf '%s\n' "$tracked_changes" | sort -u | while IFS= read -r path; do
-      [ -z "$path" ] && continue
-      git -C "$REPO_ROOT" checkout -q HEAD -- "$path" || true
-    done
-  fi
-
-  untracked_changes="$(git -C "$REPO_ROOT" ls-files --others --exclude-standard)"
-  if [ -n "$untracked_changes" ]; then
-    printf '%s\n' "$untracked_changes" | while IFS= read -r path; do
-      [ -z "$path" ] && continue
-      if [ -d "$REPO_ROOT/$path" ]; then
-        rm -rf "$REPO_ROOT/$path"
-      else
-        rm -f "$REPO_ROOT/$path"
-      fi
-    done
-  fi
 }
 
 if [ "$cleanup_on_exit" = true ]; then
@@ -320,6 +297,7 @@ release_info "  ✓ Branch matches release train"
 require_npm_publish_auth
 
 if [ "$dry_run" = true ] || [ "$canary" = true ]; then
+  capture_release_state
   set_cleanup_trap
 fi
 
@@ -408,7 +386,7 @@ fi
 release_info ""
 if [ "$dry_run" = true ]; then
   release_info "==> Step 7/7: Cleaning up dry-run state..."
-  release_info "  ✓ Dry run leaves the working tree unchanged"
+  release_info "  Release-managed files will be restored; unrelated output is preserved"
 elif [ "$canary" = true ]; then
   release_info "==> Step 7/7: Cleaning up canary state..."
   release_info "  ✓ Canary state will be discarded after publish"

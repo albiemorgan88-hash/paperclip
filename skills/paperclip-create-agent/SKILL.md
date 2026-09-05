@@ -1,139 +1,47 @@
 ---
 name: paperclip-create-agent
-description: >
-  Create new agents in Paperclip with governance-aware hiring. Use when you need
-  to inspect adapter configuration options, compare existing agent configs,
-  draft a new agent prompt/config, and submit a hire request.
+description: Draft or submit a Paperclip agent hire when agent creation is requested.
 ---
 
-# Paperclip Create Agent Skill
+# Paperclip Agent Hiring
 
-Use this skill when you are asked to hire/create an agent.
+Separate a hire draft from submission. Reading configuration or preparing a payload does not itself create an agent.
 
-## Preconditions
+## Prepare the requested hire
 
-You need either:
+Confirm company, reporting line, role and intended work. For live discovery, use the current instance and authorised identity; keep the agent and manager in the same company.
 
-- board access, or
-- agent permission `can_create_agents=true` in your company
+| Need | Endpoint |
+|---|---|
+| Agent identity | `GET /api/agents/me` |
+| Available adapters | `GET /llms/agent-configuration.txt` |
+| Selected adapter configuration | `GET /llms/agent-configuration/{adapterType}.txt` |
+| Models for that adapter | `GET /api/companies/{companyId}/adapters/{adapterType}/models` |
+| Existing company patterns | `GET /api/companies/{companyId}/agent-configurations` |
+| Allowed icons | `GET /llms/agent-icons.txt` |
 
-If you do not have this permission, escalate to your CEO or board.
+Choose a concrete icon and a role-specific prompt. Honour the requested model; otherwise use a discovered supported model or the adapter's documented default. Preserve requested scheduling, and leave heartbeat and wake-on-demand disabled if neither was requested. State those choices in the draft. Use secret references or the configured environment rather than embedding credentials.
 
-## Workflow
+Read [the payload and approval reference](references/api-reference.md) when preparing or submitting the request. Link `sourceIssueId` or `sourceIssueIds` when the hire arose from an issue.
 
-1. Confirm identity and company context.
+## Submit when authorised
 
-```sh
-curl -sS "$PAPERCLIP_API_URL/api/agents/me" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
+Submission requires board access or `can_create_agents=true` in the company. Missing submission permission does not block preparing a useful draft. A request only to draft ends with the payload; an authorised request to create proceeds through submission and result verification.
+
+Use `POST /api/companies/{companyId}/agent-hires` with the reviewed configuration. This is a mutation: if company approval is disabled, the response can contain `approval: null` and an immediately created `idle` agent. Do not assume the endpoint only saves a draft.
+
+Inspect the response and report the actual agent/approval status. Follow pending approvals when requested or when an approval-resolution heartbeat arrives. For a revised payload, use the existing approval's revision/resubmission flow rather than silently creating a duplicate hire.
+
+## Approval follow-up
+
+Read `GET /api/approvals/{approvalId}` and `GET /api/approvals/{approvalId}/issues`. Close a linked issue only if approval resolves all requested work; otherwise record what remains. Post comments only within the authorised coordination workflow, with the current run ID on issue mutations during heartbeats.
+
+Use company-prefixed UI links, deriving the prefix from the actual issue identifier or company context:
+
+```md
+- Approval: [Approval](/<prefix>/approvals/<approval-id>)
+- Agent: [Agent](/<prefix>/agents/<agent-url-key-or-id>)
+- Source issue: [Issue](/<prefix>/issues/<issue-identifier>)
 ```
 
-2. Discover available adapter configuration docs for this Paperclip instance.
-
-```sh
-curl -sS "$PAPERCLIP_API_URL/llms/agent-configuration.txt" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-```
-
-3. Read adapter-specific docs (example: `claude_local`).
-
-```sh
-curl -sS "$PAPERCLIP_API_URL/llms/agent-configuration/claude_local.txt" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-```
-
-4. Compare existing agent configurations in your company.
-
-```sh
-curl -sS "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/agent-configurations" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-```
-
-5. Discover allowed agent icons and pick one that matches the role.
-
-```sh
-curl -sS "$PAPERCLIP_API_URL/llms/agent-icons.txt" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-```
-
-6. Draft the new hire config:
-- role/title/name
-- icon (required in practice; use one from `/llms/agent-icons.txt`)
-- reporting line (`reportsTo`)
-- adapter type
-- adapter and runtime config aligned to this environment
-- capabilities
-- run prompt in adapter config (`promptTemplate` where applicable)
-- source issue linkage (`sourceIssueId` or `sourceIssueIds`) when this hire came from an issue
-
-7. Submit hire request.
-
-```sh
-curl -sS -X POST "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/agent-hires" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "CTO",
-    "role": "cto",
-    "title": "Chief Technology Officer",
-    "icon": "crown",
-    "reportsTo": "<ceo-agent-id>",
-    "capabilities": "Owns technical roadmap, architecture, staffing, execution",
-    "adapterType": "codex_local",
-    "adapterConfig": {"cwd": "/abs/path/to/repo", "model": "o4-mini"},
-    "runtimeConfig": {"heartbeat": {"enabled": true, "intervalSec": 300, "wakeOnDemand": true}},
-    "sourceIssueId": "<issue-id>"
-  }'
-```
-
-8. Handle governance state:
-- if response has `approval`, hire is `pending_approval`
-- monitor and discuss on approval thread
-- when the board approves, you will be woken with `PAPERCLIP_APPROVAL_ID`; read linked issues and close/comment follow-up
-
-```sh
-curl -sS "$PAPERCLIP_API_URL/api/approvals/<approval-id>" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-
-curl -sS -X POST "$PAPERCLIP_API_URL/api/approvals/<approval-id>/comments" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"body":"## CTO hire request submitted\n\n- Approval: [<approval-id>](/approvals/<approval-id>)\n- Pending agent: [<agent-ref>](/agents/<agent-url-key-or-id>)\n- Source issue: [<issue-ref>](/issues/<issue-identifier-or-id>)\n\nUpdated prompt and adapter config per board feedback."}'
-```
-
-If the approval already exists and needs manual linking to the issue:
-
-```sh
-curl -sS -X POST "$PAPERCLIP_API_URL/api/issues/<issue-id>/approvals" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"approvalId":"<approval-id>"}'
-```
-
-After approval is granted, run this follow-up loop:
-
-```sh
-curl -sS "$PAPERCLIP_API_URL/api/approvals/$PAPERCLIP_APPROVAL_ID" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-
-curl -sS "$PAPERCLIP_API_URL/api/approvals/$PAPERCLIP_APPROVAL_ID/issues" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-```
-
-For each linked issue, either:
-- close it if approval resolved the request, or
-- comment in markdown with links to the approval and next actions.
-
-## Quality Bar
-
-Before sending a hire request:
-
-- Reuse proven config patterns from related agents where possible.
-- Set a concrete `icon` from `/llms/agent-icons.txt` so the new hire is identifiable in org and task views.
-- Avoid secrets in plain text unless required by adapter behavior.
-- Ensure reporting line is correct and in-company.
-- Ensure prompt is role-specific and operationally scoped.
-- If board requests revision, update payload and resubmit through approval flow.
-
-For endpoint payload shapes and full examples, read:
-`skills/paperclip-create-agent/references/api-reference.md`
+Return the prepared or submitted configuration, confirmed state and any remaining decision. Creating the agent does not imply permission to assign unrelated work, change budgets or start a new recurring schedule.

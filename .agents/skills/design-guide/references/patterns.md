@@ -1,33 +1,6 @@
----
-name: design-guide
-description: >
-  Paperclip UI design system guide for building consistent, reusable frontend
-  components. Use when creating new UI components, modifying existing ones,
-  adding pages or features to the frontend, styling UI elements, or when you
-  need to understand the design language and conventions. Covers: component
-  creation, design tokens, typography, status/priority systems, composition
-  patterns, and the /design-guide showcase page. Always use this skill
-  alongside the frontend-design skill (for visual quality) and the
-  web-design-guidelines skill (for web best practices).
----
+# Paperclip UI patterns
 
-# Paperclip Design Guide
-
-Paperclip's UI is a professional-grade control plane — dense, keyboard-driven, dark-themed by default. Every pixel earns its place.
-
-**Always use with:** `frontend-design` (visual polish) and `web-design-guidelines` (web best practices).
-
----
-
-## 1. Design Principles
-
-- **Dense but scannable.** Maximum information without clicks to reveal. Whitespace separates, not pads.
-- **Keyboard-first.** Global shortcuts (Cmd+K, C, [, ]). Power users rarely touch the mouse.
-- **Contextual, not modal.** Inline editing over dialog boxes. Dropdowns over page navigations.
-- **Dark theme default.** Neutral grays (OKLCH), not pure black. Accent colors for status/priority only. Text is the primary visual element.
-- **Component-driven.** Prefer reusable components that capture style conventions. Build at the right abstraction — not too granular, not too monolithic.
-
----
+Read the relevant section for tokens, typography, status, composition, interaction, layout or showcase changes. Repository paths are relative to the Paperclip checkout root.
 
 ## 2. Tech Stack
 
@@ -136,7 +109,7 @@ Three tiers:
 2. **Custom composites** (`ui/src/components/`) — StatusBadge, EntityRow, MetricCard, etc. These capture Paperclip-specific design language.
 3. **Page components** (`ui/src/pages/`) — Compose primitives and composites into full views.
 
-**See [references/component-index.md](references/component-index.md) for the complete component inventory with usage guidance.**
+**See [references/component-index.md](component-index.md) for the complete component inventory with usage guidance.**
 
 ### When to Create a New Component
 
@@ -316,7 +289,7 @@ This is the living showcase of every component and pattern in the app. It is the
 
 ## 11. Component Index
 
-**See [references/component-index.md](references/component-index.md) for the full component inventory.**
+**See [references/component-index.md](component-index.md) for the full component inventory.**
 
 When you create a new reusable component:
 1. Add it to the component index reference file

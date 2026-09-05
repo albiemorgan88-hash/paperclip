@@ -6,6 +6,7 @@
 - `GET /llms/agent-configuration/:adapterType.txt`
 - `GET /llms/agent-icons.txt`
 - `GET /api/companies/:companyId/agent-configurations`
+- `GET /api/companies/:companyId/adapters/:adapterType/models`
 - `GET /api/agents/:agentId/configuration`
 - `POST /api/companies/:companyId/agent-hires`
 - `GET /api/agents/:agentId/config-revisions`
@@ -24,7 +25,7 @@ Approval collaboration:
 
 ## `POST /api/companies/:companyId/agent-hires`
 
-Request body matches agent create shape:
+Request body matches agent create shape. The example has scheduling disabled; enable it only when requested. Replace the model placeholder with a discovered supported model, or omit it when using the adapter's documented default:
 
 ```json
 {
@@ -37,14 +38,13 @@ Request body matches agent create shape:
   "adapterType": "claude_local",
   "adapterConfig": {
     "cwd": "/absolute/path",
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "<discovered-model-id>",
     "promptTemplate": "You are CTO..."
   },
   "runtimeConfig": {
     "heartbeat": {
-      "enabled": true,
-      "intervalSec": 300,
-      "wakeOnDemand": true
+      "enabled": false,
+      "wakeOnDemand": false
     }
   },
   "budgetMonthlyCents": 0,
@@ -91,5 +91,5 @@ For hire approvals:
 - Config read APIs redact obvious secrets.
 - `pending_approval` agents cannot run heartbeats, receive assignments, or create keys.
 - All actions are logged in activity for auditability.
-- Use markdown in issue/approval comments and include links to approval, agent, and source issue.
+- Use markdown and company-prefixed links in authorised comments: `/<prefix>/approvals/<approval-id>`, `/<prefix>/agents/<agent-key>`, and `/<prefix>/issues/<issue-identifier>`.
 - After approval resolution, requester may be woken with `PAPERCLIP_APPROVAL_ID` and should reconcile linked issues.

@@ -1,104 +1,40 @@
 ---
 name: para-memory-files
-description: >
-  File-based memory system using Tiago Forte's PARA method. Use this skill whenever
-  you need to store, retrieve, update, or organize knowledge across sessions. Covers
-  three memory layers: (1) Knowledge graph in PARA folders with atomic YAML facts,
-  (2) Daily notes as raw timeline, (3) Tacit knowledge about user patterns. Also
-  handles planning files, memory decay, weekly synthesis, and recall via qmd.
-  Trigger on any memory operation: saving facts, writing daily notes, creating
-  entities, running weekly synthesis, recalling past context, or managing plans.
+description: Recall or maintain an explicitly configured Paperclip PARA memory store.
 ---
 
 # PARA Memory Files
 
-Persistent, file-based memory organized by Tiago Forte's PARA method. Three layers: a knowledge graph, daily notes, and tacit knowledge. All paths are relative to `$AGENT_HOME`.
+Use this for prior context or authorised memory updates in a configured Paperclip memory workspace. Verify `$AGENT_HOME` and the host's memory policy before selecting files. Do not create a competing memory store when the host already defines one.
 
-## Three Memory Layers
+## Recall
 
-### Layer 1: Knowledge Graph (`$AGENT_HOME/life/` -- PARA)
+Read an entity's `summary.md` first, then relevant `items.yaml` facts when detail is needed. Use the configured `qmd` collection if available; otherwise use local file search. A recall request does not authorise indexing, access-counter updates or other writes.
 
-Entity-based storage. Each entity gets a folder with two tiers:
-
-1. `summary.md` -- quick context, load first.
-2. `items.yaml` -- atomic facts, load on demand.
-
-```text
-$AGENT_HOME/life/
-  projects/          # Active work with clear goals/deadlines
-    <name>/
-      summary.md
-      items.yaml
-  areas/             # Ongoing responsibilities, no end date
-    people/<name>/
-    companies/<name>/
-  resources/         # Reference material, topics of interest
-    <topic>/
-  archives/          # Inactive items from the other three
-  index.md
+```sh
+qmd search "specific phrase"
+qmd query "question about prior context"
 ```
 
-**PARA rules:**
+Check dates and supersession, and distinguish historical notes from current evidence.
 
-- **Projects** -- active work with a goal or deadline. Move to archives when complete.
-- **Areas** -- ongoing (people, companies, responsibilities). No end date.
-- **Resources** -- reference material, topics of interest.
-- **Archives** -- inactive items from any category.
+## Authorised storage
 
-**Fact rules:**
+Write only when the user requests storage or the host explicitly authorises it. Store supported facts and decisions with provenance; do not infer personal facts from examples or unverified output. An authorised memory write does not authorise edits to AGENTS.md, TOOLS.md, skills or host configuration. Propose instruction changes separately unless the current request includes them.
 
-- Save durable facts immediately to `items.yaml`.
-- Weekly: rewrite `summary.md` from active facts.
-- Never delete facts. Supersede instead (`status: superseded`, add `superseded_by`).
-- When an entity goes inactive, move its folder to `$AGENT_HOME/life/archives/`.
+| Store under the verified agent home | Purpose |
+|---|---|
+| `life/projects/<name>/` | Active work with a goal or deadline |
+| `life/areas/people/<name>/` or `life/areas/companies/<name>/` | Continuing responsibilities and relationships |
+| `life/resources/<topic>/` | Reference knowledge |
+| `life/archives/` | Inactive entities |
+| `memory/YYYY-MM-DD.md` | Requested event notes |
+| `MEMORY.md` | Confirmed operating preferences |
 
-**When to create an entity:**
+Entity folders contain `summary.md` and `items.yaml`; `life/index.md` is their index. Create an entity when durable facts justify one. Supersede incorrect facts with `status: superseded` and `superseded_by` rather than silently deleting history.
 
-- Mentioned 3+ times, OR
-- Direct relationship to the user (family, coworker, partner, client), OR
-- Significant project or company in the user's life.
-- Otherwise, note it in daily notes.
-
-For the atomic fact YAML schema and memory decay rules, see [references/schemas.md](references/schemas.md).
-
-### Layer 2: Daily Notes (`$AGENT_HOME/memory/YYYY-MM-DD.md`)
-
-Raw timeline of events -- the "when" layer.
-
-- Write continuously during conversations.
-- Extract durable facts to Layer 1 during heartbeats.
-
-### Layer 3: Tacit Knowledge (`$AGENT_HOME/MEMORY.md`)
-
-How the user operates -- patterns, preferences, lessons learned.
-
-- Not facts about the world; facts about the user.
-- Update whenever you learn new operating patterns.
-
-## Write It Down -- No Mental Notes
-
-Memory does not survive session restarts. Files do.
-
-- Want to remember something -> WRITE IT TO A FILE.
-- "Remember this" -> update `$AGENT_HOME/memory/YYYY-MM-DD.md` or the relevant entity file.
-- Learn a lesson -> update AGENTS.md, TOOLS.md, or the relevant skill file.
-- Make a mistake -> document it so future-you does not repeat it.
-- On-disk text files are always better than holding it in temporary context.
-
-## Memory Recall -- Use qmd
-
-Use `qmd` rather than grepping files:
-
-```bash
-qmd query "what happened at Christmas"   # Semantic search with reranking
-qmd search "specific phrase"              # BM25 keyword search
-qmd vsearch "conceptual question"         # Pure vector similarity
-```
-
-Index your personal folder: `qmd index $AGENT_HOME`
-
-Vectors + BM25 + reranking finds things even when the wording differs.
+For authorised fact updates, access tracking, synthesis or archive maintenance, read [the schema and decay rules](references/schemas.md). Weekly synthesis runs only when requested or covered by an existing authorised schedule; this skill does not create a schedule.
 
 ## Planning
 
-Keep plans in timestamped files in `plans/` at the project root (outside personal memory so other agents can access them). Use `qmd` to search plans. Plans go stale -- if a newer plan exists, do not confuse yourself with an older version. If you notice staleness, update the file to note what it is supersededBy.
+Keep shared plans in the repository's established location, outside personal memory. Paperclip repository plans belong in `doc/plans/YYYY-MM-DD-slug.md`; another repository's instructions take precedence there. Preserve original plans and mark supersession only within the requested edit scope.

@@ -12,6 +12,24 @@ The release model is branch-driven:
 6. Create the GitHub Release
 7. Merge `release/X.Y.Z` back to `master` without squash or rebase
 
+## Preparation, rehearsal and publication
+
+Choose the scope from the request. The publishing procedures below apply only to an authorised live release; a draft or dry-run request ends with that artifact and its verification.
+
+- Plan without creating a branch or worktree: `./scripts/release-start.sh patch --dry-run`.
+- Prepare locally without pushing: `./scripts/release-start.sh patch --no-push`.
+- Both commands fetch remote state. Neither flag means fully read-only operation.
+
+For a packaging rehearsal, use a clean disposable clone and a dedicated release worktree with no concurrent writes. Create the train there with `--no-push`, enter the returned worktree, and run the appropriate dry-run only:
+
+```bash
+./scripts/release.sh patch --canary --dry-run
+# Or, with the stable changelog prepared:
+./scripts/release.sh patch --dry-run
+```
+
+Versioning and builds modify local files. Cleanup restores release-managed files and preserves unrelated staged/untracked work; it is not a general worktree cleaner. Do not append a live publish command to a rehearsal. Missing npm publish rights does not block rehearsal or drafting. See `.agents/skills/release/SKILL.md` for mode routing.
+
 ## Release Surfaces
 
 Every release has four separate surfaces:
@@ -21,7 +39,7 @@ Every release has four separate surfaces:
 3. **GitHub** — the stable release gets a git tag and GitHub Release
 4. **Website / announcements** — the stable changelog is published externally and announced
 
-A release is done only when all four surfaces are handled.
+A full release tracks all four surfaces. Complete the surfaces within the requested authority and report any remaining publication, merge or announcement action explicitly; prepare its artifact without treating a draft as permission to publish.
 
 ## Core Invariants
 
@@ -54,18 +72,12 @@ That script:
 
 ### 2. Draft the stable changelog
 
-From the release worktree:
-
-```bash
-VERSION=X.Y.Z
-claude --print --output-format stream-json --verbose --dangerously-skip-permissions --model claude-opus-4-6 "Use the release-changelog skill to draft or update releases/v${VERSION}.md for Paperclip. Read doc/RELEASING.md and .agents/skills/release-changelog/SKILL.md, then generate the stable changelog for v${VERSION} from commits since the last stable tag. Do not create a canary changelog."
-```
+From the release worktree, use `release-changelog` with the configured agent to prepare `releases/vX.Y.Z.md` from the stable release range. Preserve manual edits and honour an already-requested update; changing model or permission settings is not required for changelog drafting.
 
 ### 3. Verify and publish a canary
 
 ```bash
 ./scripts/release-preflight.sh canary patch
-./scripts/release.sh patch --canary --dry-run
 ./scripts/release.sh patch --canary
 PAPERCLIPAI_VERSION=canary ./scripts/docker-onboard-smoke.sh
 ```
@@ -80,9 +92,8 @@ npx paperclipai@canary onboard
 
 ```bash
 ./scripts/release-preflight.sh stable patch
-./scripts/release.sh patch --dry-run
 ./scripts/release.sh patch
-git push public-gh HEAD --follow-tags
+git push <verified-release-remote> HEAD --follow-tags
 ./scripts/create-github-release.sh X.Y.Z
 ```
 
@@ -183,7 +194,6 @@ pnpm build
 Run:
 
 ```bash
-./scripts/release.sh <patch|minor|major> --canary --dry-run
 ./scripts/release.sh <patch|minor|major> --canary
 ```
 
@@ -193,7 +203,7 @@ Result:
 - `latest` is unchanged
 - no git tag is created
 - no GitHub Release is created
-- the worktree returns to clean after the script finishes
+- release-managed version files are restored after the script finishes; unrelated work is preserved
 
 Guardrails:
 
@@ -243,14 +253,13 @@ If smoke testing fails:
 1. stop the stable release
 2. fix the issue on the same `release/X.Y.Z` branch
 3. publish another canary
-4. rerun smoke testing
+4. rerun smoke testing within the existing publication authority; stop if a recurring failure needs a changed decision or unavailable external prerequisite
 
 ### 6. Publish stable from the same release branch
 
 Once the branch head is vetted, run:
 
 ```bash
-./scripts/release.sh <patch|minor|major> --dry-run
 ./scripts/release.sh <patch|minor|major>
 ```
 
@@ -275,7 +284,7 @@ Those checks intentionally freeze the train after stable publish.
 After stable publish succeeds:
 
 ```bash
-git push public-gh HEAD --follow-tags
+git push <verified-release-remote> HEAD --follow-tags
 ./scripts/create-github-release.sh X.Y.Z
 ```
 
@@ -373,7 +382,7 @@ Instead:
 
 1. fix the issue on `release/X.Y.Z`
 2. publish another canary
-3. rerun smoke testing
+3. rerun smoke testing within the existing publication authority; stop if a recurring failure needs a changed decision or unavailable external prerequisite
 
 ### If stable npm publish succeeds but push or GitHub release creation fails
 

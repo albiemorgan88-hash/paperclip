@@ -7,18 +7,15 @@ Guidance for human and AI contributors working in this repository.
 Paperclip is a control plane for AI-agent companies.
 The current implementation target is V1 and is defined in `doc/SPEC-implementation.md`.
 
-## 2. Read This First
+## 2. Read What the Task Needs
 
-Before making changes, read in this order:
+- Product behaviour and shared contracts: relevant sections of `doc/SPEC-implementation.md` (the V1 contract).
+- Product direction: `doc/GOAL.md` and `doc/PRODUCT.md`; `doc/SPEC.md` is long-horizon context.
+- Setup, worktree isolation and local commands: `doc/DEVELOPING.md`.
+- Schema or migration changes: `doc/DATABASE.md` and the database workflow below.
+- Release preparation or publishing: `doc/RELEASING.md` and `.agents/skills/release/SKILL.md`.
 
-1. `doc/GOAL.md`
-2. `doc/PRODUCT.md`
-3. `doc/SPEC-implementation.md`
-4. `doc/DEVELOPING.md`
-5. `doc/DATABASE.md`
-
-`doc/SPEC.md` is long-horizon product context.
-`doc/SPEC-implementation.md` is the concrete V1 build contract.
+Do not load the whole documentation stack for unrelated or small changes.
 
 ## 3. Repo Map
 
@@ -28,33 +25,9 @@ Before making changes, read in this order:
 - `packages/shared/`: shared types, constants, validators, API path constants
 - `doc/`: operational and product docs
 
-## 4. Dev Setup (Auto DB)
+## 4. Local Development
 
-Use embedded PGlite in dev by leaving `DATABASE_URL` unset.
-
-```sh
-pnpm install
-pnpm dev
-```
-
-This starts:
-
-- API: `http://localhost:3100`
-- UI: `http://localhost:3100` (served by API server in dev middleware mode)
-
-Quick checks:
-
-```sh
-curl http://localhost:3100/api/health
-curl http://localhost:3100/api/companies
-```
-
-Reset local dev DB:
-
-```sh
-rm -rf data/pglite
-pnpm dev
-```
+Use `pnpm install` and `pnpm dev` for local setup. The default app serves API and UI on port 3100. Database selection and persistent data paths are documented in `doc/DEVELOPING.md`; use an isolated instance for a worktree and confirm the target before any data reset.
 
 ## 5. Core Engineering Rules
 
@@ -105,7 +78,9 @@ Notes:
 
 ## 7. Verification Before Hand-off
 
-Run this full check before claiming done:
+Match verification to the change. For documentation or instruction edits, check references, example commands and any changed contracts; a full application build is not required solely for wording changes. For code, run affected checks and broaden when shared behaviour or unresolved failures justify it.
+
+Release candidates and changes spanning shared contracts require the full gate:
 
 ```sh
 pnpm -r typecheck
@@ -113,7 +88,7 @@ pnpm test:run
 pnpm build
 ```
 
-If anything cannot be run, explicitly report what was not run and why.
+Fix failures caused by the requested change and rerun affected checks. Reuse passing results for an unchanged revision unless new evidence warrants a rerun. If anything cannot be run, report what was not run and why.
 
 ## 8. API and Auth Expectations
 
@@ -140,6 +115,8 @@ When adding endpoints:
 A change is done when all are true:
 
 1. Behavior matches `doc/SPEC-implementation.md`
-2. Typecheck, tests, and build pass
+2. Relevant verification passes; release candidates and shared-contract changes pass the full gate above
 3. Contracts are synced across db/shared/server/ui
 4. Docs updated when behavior or commands change
+
+For implementation requests, continue through relevant verification and correction of failures caused by the change. Prepare a concrete result before seeking a decision outside the authorised scope. A request for a draft, plan for review or audit ends with that deliverable; planning within an implementation request does not require an automatic review stop.

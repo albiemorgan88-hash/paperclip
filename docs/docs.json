@@ -109,7 +109,7 @@
               "api/overview",
               "api/authentication",
               "api/companies",
-              "api/agents",
+              "api/agent-api",
               "api/issues",
               "api/approvals",
               "api/goals-and-projects",
@@ -136,6 +136,12 @@
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/api/agents",
+      "destination": "/api/agent-api"
+    }
+  ],
   "footerSocials": {
     "github": "https://github.com/paperclip-ai/paperclip"
   }

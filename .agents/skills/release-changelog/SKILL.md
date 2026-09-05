@@ -28,16 +28,16 @@ ls releases/v{version}.md 2>/dev/null
 If it exists:
 
 1. read it first
-2. present it to the reviewer
-3. ask whether to keep it, regenerate it, or update specific sections
-4. never overwrite it silently
+2. preserve existing manual edits
+3. apply an already-requested update to the specified sections; do not ask again for that same authority
+4. if the request leaves a material keep/regenerate decision unresolved, present the existing content and ask about that decision before replacing it
 
 ## Step 1 — Determine the Stable Range
 
 Find the last stable tag:
 
 ```bash
-git tag --list 'v*' --sort=-version:refname | head -1
+git tag --list 'v*' --sort=-version:refname | rg '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1
 git log v{last}..HEAD --oneline --no-merges
 ```
 
@@ -62,7 +62,7 @@ Useful commands:
 ```bash
 git log v{last}..HEAD --oneline --no-merges
 git log v{last}..HEAD --format="%H %s" --no-merges
-ls .changeset/*.md | grep -v README.md
+rg --files --hidden .changeset -g '*.md' -g '!README.md'
 gh pr list --state merged --search "merged:>={last-tag-date}" --json number,title,body,labels
 ```
 

@@ -21,7 +21,7 @@
 
 Facts decay in retrieval priority over time so stale info does not crowd out recent context.
 
-**Access tracking:** When a fact is used in conversation, bump `access_count` and set `last_accessed` to today. During heartbeat extraction, scan the session for referenced entity facts and update their access metadata.
+**Access tracking (authorised writes only):** When memory maintenance is authorised, bump `access_count` and set `last_accessed` for facts used. Recall alone must not mutate metadata. Heartbeat extraction follows the host's memory policy, not an automatic permission from this reference.
 
 **Recency tiers (for summary.md rewriting):**
 
@@ -30,6 +30,6 @@ Facts decay in retrieval priority over time so stale info does not crowd out rec
 - **Cold** (30+ days or never accessed) -- omit from summary.md. Still in items.yaml, retrievable on demand.
 - High `access_count` resists decay -- frequently used facts stay warm longer.
 
-**Weekly synthesis:** Sort by recency tier, then by access_count within tier. Cold facts drop out of the summary but remain in items.yaml. Accessing a cold fact reheats it.
+**Weekly synthesis (when requested or already scheduled with authority):** Sort by recency tier, then by access_count within tier. Cold facts drop out of the summary but remain in items.yaml. Accessing a cold fact reheats it.
 
 No deletion. Decay only affects retrieval priority via summary.md curation. The full record always lives in items.yaml.
